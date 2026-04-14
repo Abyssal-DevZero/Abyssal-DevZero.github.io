@@ -1,7 +1,4 @@
-// ============================================================
-// PLAYER STATE
-// Everything about the player lives in this one object
-// ============================================================
+// Player State
 const player = {
   health: 100,
   maxHealth: 100,
@@ -14,28 +11,24 @@ const player = {
     stone: 0,
     herb: 0,
   },
-  tools: [],        // e.g. ["Torch", "Pickaxe"]
+  tools: [],
   inCombat: false,
   currentEnemy: null,
 };
 
-// ============================================================
-// FOLLOWERS
-// followerDefs are defined in world.js.
-// activeFollowers holds the runtime state of each recruited follower.
-// ============================================================
+// Follower System
+//====
 const activeFollowers = [];
 
-// Recruit a follower by their definition name (called when player finds them)
+//Mitglieder
 function recruitFollower(defName) {
   const def = followerDefs.find(f => f.name === defName);
   if (!def) return;
-  // Don't add duplicates
-  if (activeFollowers.find(f => f.name === def.name)) return;
+  if (activeFollowers.find(f => f.name === def.name)) return; //Duplicate guard
 
   const follower = {
     name: def.name,
-    task: def.task,   // fixed — set in world.js, never changes
+    task: def.task,
     progress: 0,
     intervalId: null,
   };
@@ -46,7 +39,6 @@ function recruitFollower(defName) {
 }
 
 function startFollowerLoop(follower) {
-  // Tick every 100ms — 20 ticks × 5 = 100 over 2 seconds
   follower.intervalId = setInterval(() => {
     follower.progress += 5;
     if (follower.progress >= 100) {
@@ -178,9 +170,7 @@ const recipes = [
   },
 ];
 
-// ============================================================
 // PRINT — your main way to show text to the player
-// ============================================================
 function print(text, color) {
   const log = document.getElementById("log");
   const p = document.createElement("p");
@@ -191,9 +181,8 @@ function print(text, color) {
   log.scrollTop = log.scrollHeight;
 }
 
-// ============================================================
 // UPDATE UI — refreshes the sidebar numbers and tool list
-// ============================================================
+
 function updateUI() {
   // Resources
   document.getElementById("res-health").textContent =
