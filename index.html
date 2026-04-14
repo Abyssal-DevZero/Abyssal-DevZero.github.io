@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dark Depths</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --panel:     #111111;
+      --border:    #2a2a2a;
+      --text:      #c8c8c8;
+      --text-dim:  #555;
+      --accent:    #8a6a3a;
+      --accent-hi: #c89a5a;
+      --danger:    #7a3030;
+      --log-bg:    #080808;
+      --btn-bg:    #1a1a1a;
+      --btn-hover: #252525;
+      --footer-h:  36px;
+      --log-h:     110px;
+      --sidebar-w: 220px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      overflow: hidden;
+    }
+
+    /* ── LAYOUT
+       [ sidebar ] [ log     ]
+       [ sidebar ] [ actions ]
+       [     footer          ]
+    ── */
+    #app {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-rows: 1fr var(--footer-h);
+      height: 100vh;
+    }
+
+    /* ── SIDEBAR: full height left column ── */
+    #sidebar {
+      grid-column: 1;
+      grid-row: 1;
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    /* ── RIGHT COLUMN: log stacked above actions ── */
+    #right {
+      grid-column: 2;
+      grid-row: 1;
+      display: grid;
+      grid-template-rows: var(--log-h) 1fr;
+      overflow: hidden;
+      position: relative;  /* anchor for the map overlay */
+    }
+
+    /* ── LOG ── */
+    #log {
+      background: var(--log-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      overflow-y: auto;
+    }
+
+    #log p {
+      line-height: 1.7;
+      color: var(--text-dim);
+      transition: color 0.4s;
+    }
+
+    #log p:last-child { color: var(--text); }
+
+    /* ── ACTIONS ── */
+    #actions {
+      padding: 14px;
+      overflow-y: auto;
+    }
+
+    /* ── FOOTER: spans both columns ── */
+    #footer {
+      grid-column: 1 / 3;
+      grid-row: 2;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 16px;
+      height: var(--footer-h);
+    }
+
+    /* ── SIDEBAR internals ── */
+    .panel-title {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    .resource-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+
+    .resource-name  { color: var(--text-dim); }
+    .resource-amount { color: var(--text); }
+
+    #tools-list {
+      color: var(--accent-hi);
+      line-height: 1.8;
+    }
+
+    /* ── ACTION PANEL internals ── */
+    #tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .tab {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    .tab.active {
+      color: var(--text);
+      border-bottom: 2px solid var(--accent-hi);
+      margin-bottom: -11px;
+    }
+
+    .tab:hover:not(.active) { color: var(--text); }
+
+    .action-section { margin-bottom: 18px; }
+
+    .action-section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      position: relative;
+      overflow: hidden;
+      background: var(--btn-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    /* The fill that grows left-to-right during the delay */
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: var(--accent);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .btn.loading::after {
+      animation: btn-fill var(--fill-duration, 2000ms) linear forwards;
+    }
+
+    @keyframes btn-fill {
+      from { width: 0%; }
+      to   { width: 100%; }
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--btn-hover);
+      border-color: var(--accent);
+      color: var(--accent-hi);
+    }
+
+    .btn:active:not(:disabled) {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .btn-danger { border-color: var(--danger); color: #cc6666; }
+    .btn-danger:hover:not(:disabled) {
+      border-color: #cc4444;
+      color: #ff8888;
+      background: #1a0a0a;
+    }
+
+    #combat-section { display: none; }
+
+    .footer-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+
+    .footer-btn:hover { color: var(--text); }
+
+    /* ── MAP FLAIR PANEL ── */
+    #flair-panel {
+      margin-top: auto;  /* pushes it to the bottom of the sidebar */
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .flair-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    #time-display {
+      color: var(--accent-hi);
+      letter-spacing: 0.1em;
+    }
+
+    /* Progress bar track */
+    .progress-track {
+      height: 4px;
+      background: var(--border);
+      margin-top: 5px;
+      position: relative;
+    }
+
+    /* Progress bar fill */
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    /* ── MAP OVERLAY — always visible, bottom-right of #right ── */
+    #map-overlay {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 350px;
+      height: 250px;
+      background: #080808;
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      overflow: hidden;
+      cursor: grab;
+      z-index: 10;
+    }
+
+    #map-overlay:active { cursor: grabbing; }
+
+    /* The SVG sits inside and is panned via transform on a <g> */
+    #map-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Reset button */
+    #map-reset {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 13px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 1px 3px;
+      z-index: 11;
+    }
+
+    #map-reset:hover { color: var(--text); }
+
+    /* Small label in the corner */
+    #map-overlay-title {
+      position: absolute;
+      top: 5px;
+      left: 7px;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      text-transform: uppercase;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* ── FOLLOWERS PANEL ── */
+    #followers-panel {
+      display: none;
+      width: 200px;
+    }
+
+    .follower-card {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      width: 200px;
+    }
+
+    .follower-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .follower-name {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--accent-hi);
+    }
+
+    .follower-task {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .follower-track {
+      height: 3px;
+      background: var(--border);
+    }
+
+    .follower-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.1s linear;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- LEFT: SIDEBAR full height -->
+  <div id="sidebar">
+
+    <div id="status-panel">
+      <div class="panel-title">Status</div>
+      <div class="resource-row">
+        <span class="resource-name">Health</span>
+        <span class="resource-amount" id="res-health" style="color: #c04444;">100 / 100</span>
+      </div>
+      <div class="resource-row">
+        <span class="resource-name">Mana</span>
+        <span class="resource-amount" id="res-mana" style="color: #4466cc;">50 / 50</span>
+      </div>
+    </div>
+
+    <div id="resources-panel">
+      <div class="panel-title">Resources</div>
+      <div class="resource-row">
+        <span class="resource-name">Gold</span>
+        <span class="resource-amount" id="res-gold">0</span>
+      </div>
+      <div class="resource-row">
+        <span class="resource-name">Wood</span>
+        <span class="resource-amount" id="res-wood">0</span>
+      </div>
+      <div class="resource-row">
+        <span class="resource-name">Stone</span>
+        <span class="resource-amount" id="res-stone">0</span>
+      </div>
+      <div class="resource-row">
+        <span class="resource-name">Herb</span>
+        <span class="resource-amount" id="res-herb">0</span>
+      </div>
+    </div>
+
+    <div id="tools-panel">
+      <div class="panel-title">Tools</div>
+      <div id="tools-list">None</div>
+    </div>
+
+    <!-- FLAIR: time + map location, pinned to the bottom -->
+    <div id="flair-panel">
+
+      <div>
+        <div class="flair-row">
+          <span class="resource-name">Time</span>
+          <span id="time-display">??:??</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="flair-row">
+          <span class="resource-name" id="map-room-name">Cave Entrance</span>
+          <span class="resource-amount" id="map-progress-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="map-progress-fill"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- RIGHT: log on top, actions below -->
+  <div id="right">
+
+    <div id="log"></div>
+
+    <div id="actions">
+      <div id="tabs">
+        <button class="tab active" data-tab="cave" onclick="showTab('cave')">Cave</button>
+        <button class="tab" id="tab-followers" data-tab="followers" style="display:none" onclick="showTab('followers')">Followers</button>
+      </div>
+
+      <div id="explore-section">
+        <div class="action-section">
+          <div class="action-section-title">Gather</div>
+          <div class="action-buttons">
+            <button class="btn" onclick="withDelay(this, gatherWood)">Wood</button>
+            <button class="btn" id="btn-gather-stone" style="display:none" onclick="withDelay(this, gatherStone)">Stone</button>
+            <button class="btn" id="btn-gather-herb"  style="display:none" onclick="withDelay(this, gatherHerb)">Herb</button>
+          </div>
+        </div>
+
+        <div class="action-section">
+          <div class="action-section-title">Craft</div>
+          <div class="action-buttons">
+            <button class="btn" id="btn-craft-torch" onclick="withDelay(this, () => craft('Torch'))">Torch <span style="color:var(--text-dim)">2w</span></button>
+            <button class="btn" id="btn-craft-pickaxe" style="display:none" onclick="withDelay(this, () => craft('Pickaxe'))">Pickaxe <span style="color:var(--text-dim)">3w 2s</span></button>
+            <button class="btn" id="btn-craft-potion"  style="display:none" onclick="withDelay(this, () => craft('Health Potion'))">Potion <span style="color:var(--text-dim)">3h</span></button>
+          </div>
+        </div>
+
+        <div class="action-section">
+          <div class="action-section-title">Explore</div>
+          <div class="action-buttons">
+            <button class="btn" id="btn-explore" onclick="withDelay(this, explore, 5000)">Venture Deeper</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="combat-section">
+        <div class="action-section">
+          <div class="action-section-title" style="color:#cc6666">⚔ Combat</div>
+          <div class="action-buttons">
+            <button class="btn" onclick="playerAttack()">Attack</button>
+            <button class="btn btn-danger" onclick="playerFlee()">Flee</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOLLOWERS PANEL -->
+      <div id="followers-panel">
+        <div class="action-section">
+          <div class="action-section-title">Followers</div>
+          <div id="followers-list"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MAP OVERLAY — always visible bottom-right corner -->
+    <div id="map-overlay">
+      <span id="map-overlay-title">Map</span>
+      <button id="map-reset" title="Reset view" onmousedown="event.stopPropagation()" onclick="resetMapView()">↺</button>
+      <svg id="map-svg" xmlns="http://www.w3.org/2000/svg"><g id="map-content"></g></svg>
+    </div>
+
+  </div>
+
+  <!-- FOOTER: full width -->
+  <div id="footer">
+    <button class="footer-btn">Dark Depths v0.1</button>
+  </div>
+
+</div>
+
+<script src="world.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
